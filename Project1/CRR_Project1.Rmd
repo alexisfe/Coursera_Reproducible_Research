@@ -1,0 +1,139 @@
+Reproducible Research - Project 1
+===============================
+```{r echo=FALSE}
+library(knitr)
+opts_chunk$set(cache=T, echo=T, warning=F, message=F)
+```
+
+##Read and transform data
+Import library "ggplot2"
+```{r}
+library(ggplot2)
+```
+
+Define data type "actDate" to transform it into the data type Date according to the input date format
+```{r}
+setAs("character","actDate", function(from) as.Date(from, format="%Y-%m-%d") )
+```
+
+Download file from the internet and assign to variable df
+```{r}
+temp <- tempfile()
+download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",temp)
+df <- read.csv(unz(temp, "activity.csv"), colClasses=c("numeric", "actDate", "numeric"))
+unlink(temp)
+```
+
+Aggregate data by date over average number of steps
+```{r}
+aggdf <- aggregate(x=df$steps, by=list(Group.date = df$date), FUN=mean, na.rm=TRUE)
+```
+
+##Daily steps by date
+```{r}
+qplot(aggdf$x, geom="histogram"
+      , binwidth=5
+      , main="Histogram of daily steps"
+      , xlab="Average daily steps"
+      , fill=I("white")
+      , col=I("black") 
+      , alpha=I(.2)
+      )
+```
+
+Mean: 
+```{r, echo=FALSE} 
+mean(aggdf$x, na.rm=TRUE)
+```
+
+Median:
+```{r, echo=FALSE} 
+median(aggdf$x, na.rm=TRUE)
+```
+
+##Average daily activity pattern
+Aggregate data by interval over average number of steps
+```{r}
+aggdf2 <- aggregate(x=df$steps, by=list(Group.interval = df$interval) , FUN=mean, na.rm=TRUE)
+```
+
+Plot of average daily steps by time interval
+
+```{r, echo=FALSE} 
+qplot(aggdf2$Group.interval, aggdf2$x, geom="line"
+      , main="Daily average steps by time interval"
+      , xlab="Time interval"
+      , ylab="Average steps")
+```
+
+##Time interval that contains the maximum number of steps taken
+```{r}
+aggdf2[aggdf2$x == max(aggdf2$x), "Group.interval"]
+```
+
+##Strategy for filling missing values and new histogram
+Calculate all means by time interval
+```{r}
+mean_by_interval <- aggregate(x=df$steps, by=list(Group.interval = df$interval), FUN=mean, na.rm=TRUE)
+```
+
+Fill all missing values using means by interval
+```{r}
+for (i in 1:nrow(df)){
+  if (is.na(df[i, "steps"]))
+    df[i, "steps"] <- mean_by_interval[mean_by_interval$Group.interval == df[i, "interval"], "x"]
+}
+```
+
+Aggregate data by date over average number of steps
+```{r}
+aggdf <-aggregate(x=df$steps, by=list(Group.date = df$date), FUN=mean, na.rm=TRUE)
+```
+
+New histogram of average daily steps
+```{r}
+qplot(aggdf$x, geom="histogram"
+      , binwidth=5
+      , main="Histogram of daily steps"
+      , xlab="Average daily steps"
+      , fill=I("white")
+      , col=I("black") 
+      , alpha=I(.2)
+      )
+```
+
+Mean: 
+```{r, echo=FALSE} 
+mean(aggdf$x, na.rm=TRUE)
+```
+
+Median:
+```{r, echo=FALSE} 
+median(aggdf$x, na.rm=TRUE)
+```
+
+##Differences in activity patterns between weekdays and weekends
+New factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+df[grepl("Sat|Sun", weekdays(df$date)), "date_type"] <- "weekend"
+df[!grepl("Sat|Sun", weekdays(df$date)), "date_type"] <- "weekday"
+```
+
+Aggregate data by interval over average number of steps
+```{r}
+aggdf4 <- aggregate(x=df$steps
+                    , by=list(Group.interval = df$interval, Group.date_type = df$date_type)
+                    , FUN=mean, na.rm=TRUE)
+```
+
+Panel plot containing a time series plot of the time interval and the average number of steps taken averaged across all weekday days or weekend days
+
+```{r}
+ggplot(data=aggdf4
+       , aes(x=Group.interval, y=x)) +
+  ggtitle("Activity pattern between weekdays and weekends") +
+  xlab("Time interval") +
+  ylab("Average steps") +
+  geom_line() + 
+  facet_grid(.~ Group.date_type)
+```
